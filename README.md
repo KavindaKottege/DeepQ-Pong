@@ -1,6 +1,8 @@
 # DeepQ-Pong
 A reinforcement learning agent that uses Deep Q Learning with Experience Replay to learn how to play Pong. 
 
+This method of artificial intelligence is very general and can be applied to wide variety of models to find an optimal behaviour to achieve a designated goal.
+
 Inspired by 'Playing Atari with Deep Reinforcement Learning' by DeepMind.
 https://arxiv.org/pdf/1312.5602v1.pdf
 
