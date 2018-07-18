@@ -64,7 +64,6 @@ def pre_processing(observation):
 # Define the huber loss function
 # Used for the Keras model compile function
 # Needs to take y and yhat and output loss
-# Needs investigation
 def huber_loss(y, q_value):
     error = tf.abs(y - q_value)
     quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
