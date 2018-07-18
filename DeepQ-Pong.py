@@ -53,6 +53,7 @@ def huber_loss(y, q_value):
     return loss
 
 
+# Create the model to approximate Qvalues for a given set of states and actions
 def atari_model():
     # Define the inputs
     frames_input = keras.Input(shape=In, name='frames')
@@ -87,6 +88,7 @@ def atari_model():
     # Return the model
     return model
 
+# Create an identical model to use as a target
 def atari_model_target():
     # Define the inputs
     frames_input = keras.Input(shape=Input_shape, name='frames')
