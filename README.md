@@ -5,7 +5,7 @@ Inspired by 'Playing Atari with Deep Reinforcement Learning' by DeepMind.
 https://arxiv.org/pdf/1312.5602v1.pdf
 
 Simply:
-The agent can see the screen output given by the PONG game as well as the score.
+The agent can observe the screen output given by the PONG game as well as the score.
 Based on this it will choose actions, beginning randomly.
 After observing how its actions, given the state of the PONG game is resulting in a change in score, the agent will optmise it actions.
 Repeating this process many times, the agent eventually learns how to cosistently win the game. A game is won by scoring 21 points before the opponent.
@@ -13,3 +13,5 @@ Repeating this process many times, the agent eventually learns how to cosistentl
 After playing 1115 games, the agent won its first game.
 After playing 1300 games, the agent won more than 50% of all games.
 After playing 2000 games, the agent won 96% of all games. With an average score of 21-4.
+
+The Q-value function approximater is a convolutional neural network created using the Keras API from TensorFlow.
