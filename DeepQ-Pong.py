@@ -75,7 +75,7 @@ def huber_loss(y, q_value):
 def atari_model():
     # Define the inputs
     frames_input = keras.Input(shape=ATARI_SHAPE, name='frames')
-    actions_input = keras.layers.Input(shape=(ACTION_SIZE,), name='action_mask')
+    actions_input = keras.Input(shape=(ACTION_SIZE,), name='action_mask')
 
     # Normalise the inputs from [0,255] to [0,1] - to make processing easier
     normalised = keras.layers.Lambda(lambda x: x/255.0, name='normalised')(frames_input)
@@ -109,7 +109,7 @@ def atari_model():
 def atari_model_target():
     # Define the inputs
     frames_input = keras.Input(shape=ATARI_SHAPE, name='frames')
-    actions_input = keras.layers.Input(shape=(ACTION_SIZE,), name='action_mask')
+    actions_input = keras.Input(shape=(ACTION_SIZE,), name='action_mask')
 
     # Normalise the inputs from [0,255] to [0,1] - to make processing easier
     normalised = keras.layers.Lambda(lambda x: x / 255.0, name='normalised')(frames_input)
