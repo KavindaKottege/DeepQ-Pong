@@ -11,42 +11,22 @@ import os.path
 # Define Hyperparameters
 FLAGS = tf.flags.FLAGS
 
-tf.flags.DEFINE_string('train_dir', 'MK10_train_data',
-                           """Directory where to write event logs and checkpoint. """)
-tf.flags.DEFINE_string('restore_file_path',
-                           'tf_train_breakout/breakout_model_20180628174305.h5',
-                           """Path of the restore file """)
-tf.flags.DEFINE_integer('n_episodes', 100000,
-                            """number of epochs of the optimization loop.""")
-tf.flags.DEFINE_integer('observe_step_num', 50000,
-                            """Timesteps to observe before training.""")
-tf.flags.DEFINE_integer('epsilon_anneal_num', 1000000,
-                            """frames over which to anneal epsilon.""")
-tf.flags.DEFINE_integer('update_target_model_steps', 10000,  # number of global steps before updating target Q weights
-                            """frames over which to anneal epsilon.""")
-tf.flags.DEFINE_integer('replay_memory', 400000,  # takes up to 20 GB to store this amount of history data
-                            """number of previous transitions to remember.""")
-tf.flags.DEFINE_integer('no_op_steps', 30,
-                            """Number of the steps that runs before script begin.""")
-tf.flags.DEFINE_float('regularizer_scale', 0.01,
-                          """L1 regularizer scale.""")
-tf.flags.DEFINE_integer('batch_size', 32,
-                            """Size of minibatch to train.""")
-tf.flags.DEFINE_float('learning_rate', 0.00025,
-                          """Number of batches to run.""")
-tf.flags.DEFINE_float('initial_epsilon', 1.0,
-                          """starting value of epsilon.""")
-tf.flags.DEFINE_float('final_epsilon', 0.1,
-                          """final value of epsilon.""")
-tf.flags.DEFINE_float('gamma', 0.99,
-                          """decay rate of past observations.""")
-tf.flags.DEFINE_boolean('resume', False,
-                            """Whether to resume from previous checkpoint.""")
-tf.flags.DEFINE_boolean('render', True,
-                            """Whether to display the game.""")
+tf.flags.DEFINE_float('optimiser_learning_rate', 0.00025, help='learning rate for optimiser')
+tf.flags.DEFINE_integer('observe_step_num', 100000, help='number of steps to observe before choosing actions')
+tf.flags.DEFINE_integer('batch_size', 32, help='size of batch')
+tf.flags.DEFINE_float('initial_epsilon', 1.0, help='initial value for epsilon')
+tf.flags.DEFINE_integer('epsilon_anneal_num', 500000, help='number of steps over to anneal epsilon')
+tf.flags.DEFINE_float('final_epsilon', 0.01, help='final value for epsilon')
+tf.flags.DEFINE_float('gamma', 0.99, help='decay rate for future reward')
+tf.flags.DEFINE_integer('replay_memory', 400000, 'number of previous transitions to remember')  # 400000 = 20GB RAM
+tf.flags.DEFINE_integer('n_episodes', 100000, 'number of episodes to let the model train for')
+tf.flags.DEFINE_integer('no_op_steps', 2, 'number of steps to do nothing at start of each episode')
+tf.flags.DEFINE_boolean('render', True, 'whether to render the image')
+tf.flags.DEFINE_integer('update_target_model_steps', 100000, 'update target Q model every n episodes')
+tf.flags.DEFINE_string('train_dir', 'MK7_train_data', 'location for training data and logs')
 
-ATARI_SHAPE = (84, 84, 4)  # input image size to model
-ACTION_SIZE = 3
+Input_shape = (84, 84, 4)  # input image size to model
+Action_size = 3
 
 # Create a pre-processing function
 # Converts colour image into a smaller grey-scale image
@@ -64,6 +44,7 @@ def pre_processing(observation):
 # Define the huber loss function
 # Used for the Keras model compile function
 # Needs to take y and yhat and output loss
+# Needs investigation
 def huber_loss(y, q_value):
     error = tf.abs(y - q_value)
     quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
@@ -74,8 +55,8 @@ def huber_loss(y, q_value):
 
 def atari_model():
     # Define the inputs
-    frames_input = keras.Input(shape=ATARI_SHAPE, name='frames')
-    actions_input = keras.Input(shape=(ACTION_SIZE,), name='action_mask')
+    frames_input = keras.Input(shape=In, name='frames')
+    actions_input = keras.layers.Input(shape=(Action_size,), name='action_mask')
 
     # Normalise the inputs from [0,255] to [0,1] - to make processing easier
     normalised = keras.layers.Lambda(lambda x: x/255.0, name='normalised')(frames_input)
@@ -88,7 +69,7 @@ def atari_model():
     # Then a fully connected layer with 256 ReLU units
     dense1 = keras.layers.Dense(256, activation='relu')(conv2_flatten)
     # Then a fully connected layer with a unit to map to each of the actions and no activation
-    output = keras.layers.Dense(ACTION_SIZE)(dense1)
+    output = keras.layers.Dense(Action_size)(dense1)
     # Then we multiply the output by the action mask
     # When trying to find the value of all the actions this will be a mask full of 1s
     # When trying to find the value of a specific action, the mask will only be 1 for a single action
@@ -108,8 +89,8 @@ def atari_model():
 
 def atari_model_target():
     # Define the inputs
-    frames_input = keras.Input(shape=ATARI_SHAPE, name='frames')
-    actions_input = keras.Input(shape=(ACTION_SIZE,), name='action_mask')
+    frames_input = keras.Input(shape=Input_shape, name='frames')
+    actions_input = keras.layers.Input(shape=(Action_size,), name='action_mask')
 
     # Normalise the inputs from [0,255] to [0,1] - to make processing easier
     normalised = keras.layers.Lambda(lambda x: x / 255.0, name='normalised')(frames_input)
@@ -122,7 +103,7 @@ def atari_model_target():
     # Then a fully connected layer with 256 ReLU units
     dense1 = keras.layers.Dense(256, activation='relu')(conv2_flatten)
     # Then a fully connected layer with a unit to map to each of the actions and no activation
-    output = keras.layers.Dense(ACTION_SIZE)(dense1)
+    output = keras.layers.Dense(Action_size)(dense1)
     # Then we multiply the output by the action mask
     # When trying to find the value of all the actions this will be a mask full of 1s
     # When trying to find the value of a specific action, the mask will only be 1 for a single action
@@ -143,9 +124,9 @@ def atari_model_target():
 # get action from model using epsilon-greedy policy
 def get_action(history, epsilon, step, model):
     if np.random.rand() <= epsilon or step <= FLAGS.observe_step_num:
-        return random.randrange(ACTION_SIZE)
+        return random.randrange(Action_size)
     else:
-        q_value = model.predict([history, np.ones(ACTION_SIZE).reshape(1, ACTION_SIZE)])
+        q_value = model.predict([history, np.ones(Action_size).reshape(1, Action_size)])
         return np.argmax(q_value[0])
 
 # save sample <s,a,r,s'> to the replay memory
@@ -161,8 +142,8 @@ def train_memory_batch(memory, model):
     mini_batch = random.sample(memory, FLAGS.batch_size)
     # Create empty arrays to load our minibatch into
     # These objects have multiple values hence need defined shapes
-    state = np.zeros((FLAGS.batch_size, ATARI_SHAPE[0], ATARI_SHAPE[1], ATARI_SHAPE[2]))
-    next_state = np.zeros((FLAGS.batch_size, ATARI_SHAPE[0], ATARI_SHAPE[1], ATARI_SHAPE[2]))
+    state = np.zeros((FLAGS.batch_size, Input_shape[0], Input_shape[1], Input_shape[2]))
+    next_state = np.zeros((FLAGS.batch_size, Input_shape[0], Input_shape[1], Input_shape[2]))
     # These objects have a single value, so we can just create a list that we append later
     action = []
     reward = []
@@ -172,12 +153,13 @@ def train_memory_batch(memory, model):
     # Fill up our arrays with our minibatch
     for id, val in enumerate(mini_batch):
         state[id] = val[0]
+        print(val[0].shape)
         next_state[id] = val[3]
         action.append(val[1])
         reward.append(val[2])
 
     # We want the model to predict the q value for all actions hence:
-    actions_mask = np.ones((FLAGS.batch_size, ACTION_SIZE))
+    actions_mask = np.ones((FLAGS.batch_size, Action_size))
     # Get the target model to predict the q values for all actions
     next_q_values = model.predict([next_state, actions_mask])
 
@@ -188,7 +170,7 @@ def train_memory_batch(memory, model):
         target_q[i] = reward[i] + FLAGS.gamma * np.amax(next_q_values[i])
 
     # Convert all the actions into one hot vectors
-    action_one_hot = get_one_hot(action, ACTION_SIZE)
+    action_one_hot = get_one_hot(action, Action_size)
     # Apply one hot mask onto target vector
     # This results in a vector that has the max q value in the position corresponding to the action
     target_one_hot = action_one_hot * target_q[:, None]
